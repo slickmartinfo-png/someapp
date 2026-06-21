@@ -1,0 +1,203 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  PASSENGER
+  DRIVER
+  OPERATOR
+  SUPER_ADMIN
+}
+
+enum BusType {
+  DELUXE
+  AC_DELUXE
+  VIP_SOFA
+  SLEEPER
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  REFUNDED
+}
+
+enum PaymentStatus {
+  UNPAID
+  PAID
+  FAILED
+  REFUNDED
+}
+
+enum RefundStatus {
+  NONE
+  REQUESTED
+  APPROVED
+  REJECTED
+}
+
+model User {
+  id            String         @id @default(uuid())
+  phoneNumber   String         @unique
+  fullName      String
+  email         String?        @unique
+  role          Role           @default(PASSENGER)
+  password      String?        // OTP pin or hashed password
+  isActive      Boolean        @default(true)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  bookings      Booking[]
+  reviews       Review[]
+  notifications Notification[]
+  operator      Operator?
+  driver        Driver?
+}
+
+model Operator {
+  id            String   @id @default(uuid())
+  userId        String   @unique
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  companyName   String
+  panNumber     String   @unique
+  isApproved    Boolean  @default(false)
+  supportEmail  String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  buses         Bus[]
+}
+
+model Driver {
+  id             String   @id @default(uuid())
+  userId         String   @unique
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  licenseNumber  String   @unique
+  isApproved     Boolean  @default(false)
+  currentLat     Float?
+  currentLng     Float?
+  lastLocationAt DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  trips          Trip[]
+}
+
+model Bus {
+  id          String   @id @default(uuid())
+  operatorId  String
+  operator    Operator @relation(fields: [operatorId], references: [id], onDelete: Cascade)
+  plateNumber String   @unique
+  busType     BusType  @default(DELUXE)
+  amenities   String[] // ["AC", "WiFi", "USB", "Water", "Blanket", "Sofa Seats"]
+  totalSeats  Int      @default(30)
+  photos      String[] // JSON arrays or strings
+  rating      Float    @default(5.0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  trips       Trip[]
+}
+
+model Route {
+  id            String   @id @default(uuid())
+  fromCity      String
+  toCity        String
+  distanceKm    Float
+  estimatedHrs  Float
+  popularRank   Int      @default(0) // Higher value means more popular
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  trips         Trip[]
+}
+
+model Trip {
+  id            String    @id @default(uuid())
+  busId         String
+  bus           Bus       @relation(fields: [busId], references: [id], onDelete: Cascade)
+  routeId       String
+  route         Route     @relation(fields: [routeId], references: [id], onDelete: Cascade)
+  driverId      String?
+  driver        Driver?   @relation(fields: [driverId], references: [id], onDelete: SetNull)
+  departureTime DateTime
+  arrivalTime   DateTime
+  basePrice     Float
+  availableSeats Int
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  bookings      Booking[]
+}
+
+model Booking {
+  id            String        @id @default(uuid())
+  userId        String
+  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tripId        String
+  trip          Trip          @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  seatNumbers   String[]      // e.g. ["A1", "A2"]
+  totalFare     Float
+  paymentMethod String        // eSewa, Khalti, IME_Pay, FonePay, CARD
+  paymentStatus PaymentStatus @default(UNPAID)
+  bookingStatus BookingStatus @default(PENDING)
+  ticketQrCode  String?       // base64 QR or unique ticket verification code
+  refundStatus  RefundStatus  @default(NONE)
+  refundReason  String?
+  refundAmount  Float?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  payments      Payment[]
+  refunds       Refund[]
+}
+
+model Payment {
+  id            String        @id @default(uuid())
+  bookingId     String
+  booking       Booking       @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  amount        Float
+  gateway       String        // eSewa, Khalti, IME Pay, FonePay, Card
+  transactionId String        @unique
+  paymentStatus PaymentStatus @default(UNPAID)
+  createdAt     DateTime      @default(now())
+}
+
+model Refund {
+  id           String       @id @default(uuid())
+  bookingId    String
+  booking      Booking      @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  amount       Float
+  status       RefundStatus @default(REQUESTED)
+  reason       String
+  requestedAt  DateTime     @default(now())
+  processedAt  DateTime?
+}
+
+model Notification {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title       String
+  content     String
+  isRead      Boolean  @default(false)
+  createdAt   DateTime @default(now())
+}
+
+model Coupon {
+  id          String   @id @default(uuid())
+  code        String   @unique
+  discountPct Float
+  maxDiscount Float
+  expiresAt   DateTime
+  isActive    Boolean  @default(true)
+}
+
+model Review {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  targetId  String   // Can be Trip, Driver or Bus ID
+  rating    Int
+  comment   String
+  createdAt DateTime @default(now())
+}

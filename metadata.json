@@ -1,0 +1,6 @@
+{
+  "name": "Yatra Nepal",
+  "description": "A premium full-stack Nepal bus booking platform with automated seat locking, real-time tracking simulations, custom QR e-ticketing, four specialized functional views (Passenger App, Driver App, Operator Dashboard, Super Admin Panel), and Yatra AI trip planner powered by Gemini.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
